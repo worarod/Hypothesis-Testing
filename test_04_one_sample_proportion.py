@@ -1,12 +1,8 @@
 """
 test_04_one_sample_proportion.py
 =================================
-ทดสอบสัดส่วนของประชากร 1 กลุ่ม
-  H₀: p = p₀
-
-ตัวอย่างจากสไลด์:
-  Ex10 — heat pumps 70%? (two-sided)
-  Ex11 — new drug > 60% effective (greater)
+One-Sample Proportion Test
+  H0: p = p0
 """
 
 import numpy as np
@@ -22,27 +18,26 @@ from utils import (
 
 def one_sample_proportion(
     *,
-    # ── ข้อมูลดิบ (0/1 หรือ category) ──
     data: Optional[pd.Series] = None,
-    success_value = 1,
-    # ── หรือจำนวนสำเร็จ ──
+    success_value=1,
     x: Optional[int] = None,
     n: Optional[int] = None,
-    # ── สมมติฐาน ──
     p0: float,
     alternative: Alternative = "two-sided",
     alpha: float = 0.05,
 ) -> TestResult:
     """
-    ทดสอบ H₀: p = p₀
+    Test H0: p = p0
 
     Parameters
     ----------
-    data          : pandas Series (ค่า 0/1 หรือ category)
-    success_value : ค่าที่ถือว่า "สำเร็จ" (default 1)
-    x             : จำนวนสำเร็จ
-    n             : ขนาดตัวอย่างทั้งหมด
-    p0            : สัดส่วนที่ทดสอบ (0 < p0 < 1)
+    data          : pandas Series of observations (0/1 or category)
+    success_value : value counted as success (default 1)
+    x             : number of successes
+    n             : total sample size
+    p0            : hypothesized proportion (0 < p0 < 1)
+    alternative   : 'two-sided' | 'greater' | 'less'
+    alpha         : significance level (default 0.05)
     """
     if data is not None:
         data = data.dropna()
@@ -50,7 +45,7 @@ def one_sample_proportion(
         x    = int((data == success_value).sum())
 
     if x is None or n is None:
-        raise ValueError("ต้องระบุ data หรือ x+n")
+        raise ValueError("Provide either 'data' or both 'x' and 'n'.")
 
     phat = x / n
     q0   = 1 - p0
@@ -63,12 +58,12 @@ def one_sample_proportion(
     p          = p_value_z(stat, alternative)
 
     extra = {
-        "n"            : n,
-        "x (สำเร็จ)"  : x,
-        "p̂ = x/n"     : f"{phat:.4f}",
-        "p₀"           : f"{p0:.4f}",
-        "q₀ = 1 − p₀" : f"{q0:.4f}",
-        "SE"           : f"{se:.4f}",
+        "n"              : n,
+        "x (successes)"  : x,
+        "p-hat = x/n"    : f"{phat:.4f}",
+        "p0"             : f"{p0:.4f}",
+        "q0 = 1 - p0"    : f"{q0:.4f}",
+        "Std Error"      : f"{se:.4f}",
     }
 
     return TestResult(
@@ -80,30 +75,23 @@ def one_sample_proportion(
         critical_value = cv_str,
         p_value        = round(p, 4),
         decision       = decision_str(rejected),
-        conclusion     = (
-            f"{'ปฏิเสธ' if rejected else 'ยอมรับ'} H₀ ที่ α={alpha}"
-        ),
+        conclusion     = f"{'Reject' if rejected else 'Accept'} H0 at alpha={alpha}",
         extra          = extra,
     )
 
 
-# ─────────────────────────────────────────────
-#  ตัวอย่างจากสไลด์
-# ─────────────────────────────────────────────
 if __name__ == "__main__":
 
-    print("\n── Example 10: Heat pumps 70%? (two-sided) ─────────")
-    r = one_sample_proportion(x=8, n=15, p0=0.7,
-                              alternative="two-sided", alpha=0.10)
+    print("\n-- Ex10: Heat pumps 70%? (two-sided) ---------------")
+    r = one_sample_proportion(x=8, n=15, p0=0.7, alternative="two-sided", alpha=0.10)
     print(r)
 
-    print("\n── Example 11: New drug > 60%? (greater) ───────────")
-    r = one_sample_proportion(x=70, n=100, p0=0.6,
-                              alternative="greater", alpha=0.05)
+    print("\n-- Ex11: New drug > 60%? (greater) -----------------")
+    r = one_sample_proportion(x=70, n=100, p0=0.6, alternative="greater", alpha=0.05)
     print(r)
 
-    # ── ใช้กับ Excel (คอลัมน์ 0/1) ───────────────────
+    # --- Excel usage (0/1 column) ---
     # loader = ExcelLoader("data.xlsx")
-    # col = loader.get_column("relief", sheet="Sheet1")  # 0 = ไม่หาย, 1 = หาย
+    # col = loader.get_column("relief")
     # r = one_sample_proportion(data=col, p0=0.6, alternative="greater")
     # print(r)

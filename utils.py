@@ -1,7 +1,7 @@
 """
 utils.py
 ========
-ฟังก์ชันและคลาสกลางที่ใช้ร่วมกันทุกไฟล์
+Shared utilities for all hypothesis test modules.
 """
 
 import numpy as np
@@ -13,9 +13,6 @@ from typing import Literal
 Alternative = Literal["two-sided", "greater", "less"]
 
 
-# ─────────────────────────────────────────────
-#  Result container
-# ─────────────────────────────────────────────
 @dataclass
 class TestResult:
     test_name: str
@@ -30,16 +27,10 @@ class TestResult:
     extra: dict = field(default_factory=dict)
 
     def __str__(self) -> str:
-        sep = "─" * 56
-        lines = [
-            sep,
-            f"  {self.test_name}",
-            sep,
-            f"  H₀ : {self.H0}",
-            f"  H₁ : {self.H1}",
-            f"  α  = {self.alpha}",
-            sep,
-        ]
+        sep = "-" * 56
+        lines = [sep, f"  {self.test_name}", sep,
+                 f"  H0 : {self.H0}", f"  H1 : {self.H1}",
+                 f"  alpha = {self.alpha}", sep]
         for k, v in self.extra.items():
             lines.append(f"  {k:<24} = {v}")
         if self.extra:
@@ -49,96 +40,73 @@ class TestResult:
             f"  Critical Value           : {self.critical_value}",
             f"  p-value                  = {self.p_value:.4f}",
             sep,
-            f"  Decision  : {self.decision}",
-            f"  Conclusion: {self.conclusion}",
+            f"  Decision   : {self.decision}",
+            f"  Conclusion : {self.conclusion}",
             sep,
         ]
         return "\n".join(lines)
 
 
-# ─────────────────────────────────────────────
-#  Critical value helpers
-# ─────────────────────────────────────────────
-def z_critical(alpha: float, alternative: Alternative) -> tuple[float, str]:
+def z_critical(alpha, alternative):
     if alternative == "two-sided":
         cv = stats.norm.ppf(1 - alpha / 2)
-        return cv, f"±{cv:.4f}"
+        return cv, f"+/-{cv:.4f}"
     elif alternative == "greater":
         cv = stats.norm.ppf(1 - alpha)
-        return cv, f"{cv:.4f}"
+        return cv, str(round(cv, 4))
     else:
         cv = stats.norm.ppf(alpha)
-        return cv, f"{cv:.4f}"
+        return cv, str(round(cv, 4))
 
 
-def t_critical(alpha: float, df: int, alternative: Alternative) -> tuple[float, str]:
+def t_critical(alpha, df, alternative):
     if alternative == "two-sided":
         cv = stats.t.ppf(1 - alpha / 2, df)
-        return cv, f"±{cv:.4f}"
+        return cv, f"+/-{cv:.4f}"
     elif alternative == "greater":
         cv = stats.t.ppf(1 - alpha, df)
-        return cv, f"{cv:.4f}"
+        return cv, str(round(cv, 4))
     else:
         cv = stats.t.ppf(alpha, df)
-        return cv, f"{cv:.4f}"
+        return cv, str(round(cv, 4))
 
 
-# ─────────────────────────────────────────────
-#  Reject / p-value helpers
-# ─────────────────────────────────────────────
-def reject_z(z: float, cv: float, alternative: Alternative) -> bool:
-    if alternative == "two-sided":
-        return abs(z) > cv
-    elif alternative == "greater":
-        return z > cv
-    else:
-        return z < cv
+def reject_z(z, cv, alternative):
+    if alternative == "two-sided": return abs(z) > cv
+    elif alternative == "greater": return z > cv
+    else: return z < cv
 
-
-def reject_t(t: float, cv: float, alternative: Alternative) -> bool:
+def reject_t(t, cv, alternative):
     return reject_z(t, cv, alternative)
 
+def p_value_z(z, alternative):
+    if alternative == "two-sided": return 2 * stats.norm.sf(abs(z))
+    elif alternative == "greater": return stats.norm.sf(z)
+    else: return stats.norm.cdf(z)
 
-def p_value_z(z: float, alternative: Alternative) -> float:
-    if alternative == "two-sided":
-        return 2 * stats.norm.sf(abs(z))
-    elif alternative == "greater":
-        return stats.norm.sf(z)
-    else:
-        return stats.norm.cdf(z)
+def p_value_t(t, df, alternative):
+    if alternative == "two-sided": return 2 * stats.t.sf(abs(t), df)
+    elif alternative == "greater": return stats.t.sf(t, df)
+    else: return stats.t.cdf(t, df)
 
+def decision_str(rejected):
+    return "Reject H0" if rejected else "Fail to Reject H0"
 
-def p_value_t(t: float, df: int, alternative: Alternative) -> float:
-    if alternative == "two-sided":
-        return 2 * stats.t.sf(abs(t), df)
-    elif alternative == "greater":
-        return stats.t.sf(t, df)
-    else:
-        return stats.t.cdf(t, df)
+def alt_symbol(alternative):
+    return {"two-sided": "!=", "greater": ">", "less": "<"}[alternative]
 
 
-def decision_str(rejected: bool) -> str:
-    return "Reject H₀" if rejected else "Fail to Reject H₀"
-
-
-def alt_symbol(alternative: Alternative) -> str:
-    return {"two-sided": "≠", "greater": ">", "less": "<"}[alternative]
-
-
-# ─────────────────────────────────────────────
-#  Excel loader
-# ─────────────────────────────────────────────
 class ExcelLoader:
-    """อ่านข้อมูลจากไฟล์ Excel"""
+    """Load data from an Excel file."""
 
-    def __init__(self, filepath: str):
+    def __init__(self, filepath):
         self.filepath = filepath
-        self._cache: dict = {}
+        self._cache = {}
 
-    def sheet_names(self) -> list[str]:
+    def sheet_names(self):
         return pd.ExcelFile(self.filepath).sheet_names
 
-    def load_sheet(self, sheet: str | int = 0) -> pd.DataFrame:
+    def load_sheet(self, sheet=0):
         key = str(sheet)
         if key not in self._cache:
             df = pd.read_excel(self.filepath, sheet_name=sheet)
@@ -146,13 +114,13 @@ class ExcelLoader:
             self._cache[key] = df
         return self._cache[key].copy()
 
-    def get_column(self, column: str, sheet: str | int = 0) -> pd.Series:
+    def get_column(self, column, sheet=0):
         df = self.load_sheet(sheet)
         if column not in df.columns:
             raise KeyError(f"Column '{column}' not found. Available: {list(df.columns)}")
         return pd.to_numeric(df[column], errors="coerce").dropna().reset_index(drop=True)
 
-    def get_two_columns(self, col1: str, col2: str, sheet: str | int = 0) -> tuple[pd.Series, pd.Series]:
+    def get_two_columns(self, col1, col2, sheet=0):
         df = self.load_sheet(sheet)
         sub = df[[col1, col2]].apply(pd.to_numeric, errors="coerce").dropna()
         return sub[col1].reset_index(drop=True), sub[col2].reset_index(drop=True)
